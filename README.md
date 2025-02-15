@@ -20,7 +20,7 @@
 
 2. Follow any instructions that _Stay_ or whatever you have gives you
 
-3. Go to the "UserScript" file (above) and copy all contents ([CodeHS-UserScript-Text-File]https://github.com/Heptatron/CodeHS-Auto-Replace-Shortcuts/blob/main/UserScript
+3. Go to the "UserScript" file (above) and copy all contents ([CodeHS-UserScript-Text-File]https://github.com/Heptatron/CodeHS-Auto-Replace-Shortcuts/blob/main/UserScript)
 
 4. Following your chosen application's instructions, paste it into the userscript field, replacing all existing contents that may exist in that field.
 
