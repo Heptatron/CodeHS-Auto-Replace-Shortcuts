@@ -24,6 +24,8 @@
 
 4. Following your chosen application's instructions, paste it into the userscript field, replacing all existing contents that may exist in that field.
 
+5. Your chosen application should have instructions on how to use the scripts with your browser, and how to access them.
+
 ## **Usage Instructions**
 
 This code will automatically replace user-defined shortcuts in the CodeHS editor with a user - defined code segment. 
