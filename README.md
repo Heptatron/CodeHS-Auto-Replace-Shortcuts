@@ -24,7 +24,7 @@
 
 4. Following your chosen application's instructions, paste it into the userscript field, replacing all existing contents that may exist in that field.
 
-5. Your chosen application should have instructions on how to use the scripts with your browser, and how to access them.
+5. Your chosen application should have instructions on how to use the scripts with your browser, and how to access them. With Safari, there is generally a puzzle piece icon on the bottom left that allows you to manage extensions 
 
 ## **Usage Instructions**
 
