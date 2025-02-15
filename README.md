@@ -4,7 +4,7 @@
 
 ### PC Instructions(Extension):
 
-1. Download most recent .zip file from _"versions"_ tab on right
+1. Download most recent .zip file from _"versions"_ tab on right (CodeHS-Shortcuts-Extension.zip)
 
 2. Select the .zip folder, right click and select _"unzip"_ or _"extract all"_
 
