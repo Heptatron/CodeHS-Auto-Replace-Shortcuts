@@ -2,6 +2,8 @@
 
 ## To install this code, follow these steps:
 
+### PC Instructions(Extension):
+
 1. Download most recent .zip file from _"versions"_ tab on right
 
 2. Select the .zip folder, right click and select _"unzip"_ or _"extract all"_
@@ -12,9 +14,19 @@
 
 5. Select _"Load unpacked"_, and select the _extracted_ zip folder by double clicking it and clicking Select Folder. It will probably be named Source Code.
 
+### IOS or other browser instructions (Script)
+
+1. Install something like _TamperMonkey_ on your device, such as _Stay for IOS_
+
+2. Follow any instructions that _Stay_ or whatever you have gives you
+
+3. Go to the "UserScript" file (above) and copy all contents
+
+4. Following your chosen application's instructions, paste it into the userscript field, replacing all existing contents that may exist in that field.
+
 ## **Usage Instructions**
 
-This code will automatically replace user - defined shortcuts in the CodeHS editor with a user - defined code segment. 
+This code will automatically replace user-defined shortcuts in the CodeHS editor with a user - defined code segment. 
 
 To start, click on the extension icon. Three fields will appear:
 
