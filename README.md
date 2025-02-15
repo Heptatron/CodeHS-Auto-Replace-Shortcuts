@@ -1,6 +1,6 @@
-**Installation Instructions**
+##**Installation Instructions**
 
-To install this code, follow these steps:
+#To install this code, follow these steps:
 
 1. Download most recent .zip file from _"versions"_ tab on right
 
@@ -12,7 +12,7 @@ To install this code, follow these steps:
 
 5. Select _"Load unpacked"_, and select the _extracted_ zip folder by double clicking it and clicking Select Folder. It will probably be named Source Code.
 
-**Usage Instructions**
+#**Usage Instructions**
 
 This code will automatically replace user - defined shortcuts in the CodeHS editor with a user - defined code segment. 
 
