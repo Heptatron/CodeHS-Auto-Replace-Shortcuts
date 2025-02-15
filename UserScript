@@ -1,0 +1,369 @@
+// ==UserScript==
+// @name         CodeHS auto-replace System.out.println(); and other shortcuts
+// @namespace    http://tampermonkey.net/
+// @version      0.18
+// @description  CodeHS shortcut manager with persistent storage, dynamic replacement, top-right popup, and inline suggestions.  No default shortcuts.
+// @author       Box
+// @match        https://codehs.com/*
+// @grant        GM_setValue
+// @grant        GM_getValue
+// ==/UserScript==
+
+(function() {
+    'use strict';
+
+    // Shortcut persistence using GM_setValue/GM_getValue
+    function loadShortcuts() {
+        let shortcutsStr = GM_getValue('shortcuts');
+        return shortcutsStr ? JSON.parse(shortcutsStr) : [];
+    }
+
+    function saveShortcuts(shortcuts) {
+        GM_setValue('shortcuts', JSON.stringify(shortcuts));
+    }
+
+    // CSS for the popup and inline suggestion box
+    const popupStyle = `
+        #shortcutPopup {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background-color: #333;
+            color: #eee;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+            z-index: 10000;
+            display: none;
+            max-height: 300px;
+            overflow-y: auto;
+            width: 40%; /* Adjusted width */
+        }
+        #shortcutPopup table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #shortcutPopup th, #shortcutPopup td {
+            border: 1px solid #555;
+            padding: 8px;
+            text-align: left;
+        }
+        #shortcutPopup th {
+            background-color: #444;
+        }
+        #shortcutPopup input[type="text"], #shortcutPopup input[type="number"] {
+            width: calc(100% - 22px);
+            padding: 5px 10px;
+            border: 1px solid #555;
+            border-radius: 4px;
+            background-color: #444;
+            color: #eee;
+            box-sizing: border-box;
+        }
+        #shortcutPopup button {
+            padding: 8px 16px;
+            margin: 5px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        #shortcutPopup button.delete {
+            background-color: #d9534f;
+        }
+
+        #shortcutButton {
+            position: absolute;
+            top: 10px;
+            right: 10px; /* Moved to the right */
+            padding: 8px 16px;
+            background-color: #5cb85c;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            z-index: 9999;
+        }
+        #shortcutPopup td:last-child {
+            width: 3em; /* Adjust width as needed */
+        }
+        #shortcutList {
+            position: absolute;
+            background-color: #333;
+            border: 1px solid #555;
+            list-style-type: none;
+            padding: 5px;
+            z-index: 1000;
+            color: #fff6cc;
+            display: none;
+            border-radius: 5px;
+            overflow-y: auto;
+        }
+        #shortcutList li {
+            padding: 3px 0;
+        }
+
+    `;
+
+    // Create the popup div and its contents
+    const popupDiv = document.createElement('div');
+    popupDiv.id = 'shortcutPopup';
+    popupDiv.innerHTML = `
+        <table>
+            <thead>
+                <tr><th>Shortcut</th><th>Replacement</th><th>End Offset</th><th></th></tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+        <button id="addShortcut">Add Shortcut</button>
+    `;
+
+    // Add stylesheet
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = popupStyle;
+    document.head.appendChild(styleSheet);
+
+
+    //Add button
+    const shortcutButton = document.createElement('button');
+    shortcutButton.id = 'shortcutButton';
+    shortcutButton.textContent = 'Shortcuts';
+
+    // Function to add a row to the table.  Corrected default value handling.
+    function addRow() {
+        let row = popupDiv.querySelector('tbody').insertRow();
+        let cells = [];
+        ['', '', '0'].forEach((value, i) => {
+            let cell = row.insertCell();
+            let input = document.createElement('input');
+            input.type = i === 2 ? 'number' : 'text';
+            input.value = value;
+            input.addEventListener('input', saveChanges);
+            cell.appendChild(input);
+            cells.push(input);
+        });
+        let deleteCell = row.insertCell();
+        let deleteButton = document.createElement('button');
+        deleteButton.textContent = 'X';
+        deleteButton.classList.add('delete');
+        deleteButton.onclick = () => {
+            row.remove();
+            saveChanges();
+        };
+        deleteCell.appendChild(deleteButton);
+    }
+
+    function saveChanges() {
+        const shortcuts = [];
+        [...popupDiv.querySelector('tbody').rows].forEach(row => {
+            const cells = [...row.cells].slice(0, 3).map(c => c.children[0].value);
+            if (cells[0] && cells[1] && !isNaN(parseInt(cells[2]))) {
+                shortcuts.push({ short: cells[0], replacement: cells[1], offset: parseInt(cells[2]) });
+            }
+        });
+        saveShortcuts(shortcuts);
+        updateReplacers();
+    }
+
+    // Function to update the replacers array based on the current shortcuts
+    function updateReplacers() {
+        const shortcutsData = loadShortcuts();
+        replacers.length = 0;
+        replacers.push(...shortcutsData.map(data => new TextReplacer(data.short, data.replacement, data.offset)));
+    }
+
+    // Function to show/hide the popup (updated positioning)
+    function togglePopup() {
+        const isVisible = popupDiv.style.display !== 'none';
+        popupDiv.style.display = isVisible ? 'none' : 'block';
+
+        // Correct positioning: Align top-right of popup with top-right of button
+        const buttonRect = shortcutButton.getBoundingClientRect();
+        const popupWidth = popupDiv.offsetWidth; // Get actual width of popup
+
+        popupDiv.style.top = buttonRect.top + 'px';
+        popupDiv.style.right = window.innerWidth - buttonRect.right + 'px'; // Align right
+
+        // Add/Remove event listener for clicking outside the popup
+        if (!isVisible) {
+            document.addEventListener('click', handleOutsideClick, true);
+        } else {
+            document.removeEventListener('click', handleOutsideClick, true);
+        }
+    }
+
+    // Function to handle clicks outside the popup
+    function handleOutsideClick(event) {
+        if (!popupDiv.contains(event.target) && !shortcutButton.contains(event.target)) {
+            popupDiv.style.display = 'none';
+            document.removeEventListener('click', handleOutsideClick, true);
+        }
+    }
+
+    let shortcutList = null;
+    let debounceTimer = null;
+    let lastKeyCode = null;
+
+    function createShortcutList() {
+        if (shortcutList) shortcutList.remove();
+        shortcutList = document.createElement('ul');
+        shortcutList.id = 'shortcutList';
+        document.body.appendChild(shortcutList);
+        document.addEventListener('click', () => {
+            shortcutList.style.display = 'none';
+        });
+    }
+
+    function updateShortcutList(textarea, cursorPos) {
+        lastKeyCode = lastKeyCode || null;
+        const isArrowOrEnter = [37, 38, 39, 40, 13].includes(lastKeyCode);
+
+        if (!shortcutList) createShortcutList();
+
+        if (cursorPos === 0 || isArrowOrEnter) {
+            shortcutList.style.display = 'none';
+            shortcutList.innerHTML = '';
+            return;
+        }
+
+        shortcutList.innerHTML = '';
+
+        const shortcuts = loadShortcuts();
+        const text = textarea.value;
+        let prefix = "";
+
+        for (let i = cursorPos - 1; i >= 0; i--) {
+            if (!/^[a-zA-Z0-9]$/.test(text[i])) {
+                prefix = text.substring(i + 1, cursorPos);
+                break;
+            }
+        }
+
+        if (prefix === "") {
+            prefix = text.substring(0, cursorPos);
+        }
+
+        const matchingShortcuts = shortcuts.filter(shortcut => shortcut.short.startsWith(prefix));
+
+        if (matchingShortcuts.length > 0) {
+            shortcutList.style.display = 'block';
+            matchingShortcuts.forEach(({ short, replacement }) => {
+                const li = document.createElement('li');
+                const displayReplacement = truncateString(replacement, 50);
+                li.textContent = `${short}: ${displayReplacement}`;
+                shortcutList.appendChild(li);
+            });
+        } else {
+            shortcutList.style.display = 'none';
+        }
+
+        requestAnimationFrame(() => {
+            const textareaRect = textarea.getBoundingClientRect();
+            const cursorX = textareaRect.left + getEstimatedCursorX(textarea, cursorPos);
+            const cursorY = textareaRect.top + textarea.scrollHeight;
+            const listX = cursorX - (shortcutList.offsetWidth / 2);
+            const listY = cursorY + 5;
+
+            shortcutList.style.left = listX + 'px';
+            shortcutList.style.top = listY + 'px';
+        });
+        lastKeyCode = null;
+    }
+
+    function truncateString(str, maxLength) {
+        if (str.length > maxLength) {
+            return str.substring(0, maxLength - 3) + "...";
+        }
+        return str;
+    }
+
+    function getEstimatedCursorX(textarea, cursorPos) {
+        return cursorPos * textarea.offsetWidth / textarea.value.length;
+    }
+
+    function handleInput(event) {
+        const textarea = document.querySelector('textarea');
+        if (!textarea) return;
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+            updateShortcutList(textarea, textarea.selectionStart);
+            performReplacement(textarea);
+        }, 100);
+
+        lastKeyCode = event.keyCode;
+    }
+
+    function performReplacement(textarea) {
+        const text = textarea.value;
+        const cursorPos = textarea.selectionStart;
+        const shortcuts = loadShortcuts();
+        shortcuts.forEach(({ short, replacement, offset }) => {
+            if (text.substring(cursorPos - short.length, cursorPos) === short) {
+                const newText = text.substring(0, cursorPos - short.length) + replacement + text.substring(cursorPos);
+                const newCursorPos = cursorPos + replacement.length - short.length - offset;
+                textarea.value = newText;
+                textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+            }
+        });
+    }
+
+    // Text replacer (improved cursor positioning)
+    class TextReplacer {
+        constructor(searchString, replaceString, cursorOffset) {
+            this.searchString = searchString;
+            this.replaceString = replaceString;
+            this.cursorOffset = cursorOffset;
+        }
+        replaceText(event) {
+            const textarea = event.target;
+            let cursorPos = textarea.selectionStart;
+            const text = textarea.value;
+
+            let newText = text;
+            for (let i = 0; i < this.searchString.length; i++){
+                const searchIndex = text.lastIndexOf(this.searchString, cursorPos);
+                if (searchIndex !== -1){
+                    newText = text.substring(0, searchIndex) + this.replaceString + text.substring(searchIndex + this.searchString.length);
+                    textarea.value = newText;
+                    cursorPos = searchIndex + this.replaceString.length - this.cursorOffset;
+                    if(cursorPos < 0){ cursorPos = 0;}
+                }
+            }
+
+            textarea.selectionStart = textarea.selectionEnd = cursorPos;
+        }
+    }
+
+
+    //Create initial replacers array
+    let replacers = [];
+    updateReplacers();
+
+
+    // Event listener for input
+    document.addEventListener('input', handleInput);
+    document.addEventListener('keydown', handleInput);
+    document.addEventListener('keyup', handleInput);
+
+    // Attach popup to the button
+    shortcutButton.addEventListener('click', togglePopup);
+
+    // Add the button to the page (after textarea is loaded)
+    window.addEventListener('load', () => {
+        const textarea = document.querySelector('textarea');
+        if (textarea) {
+            textarea.parentElement.style.position = 'relative';
+            textarea.parentElement.appendChild(shortcutButton);
+            document.body.appendChild(popupDiv);
+
+            const addButton = popupDiv.querySelector('#addShortcut');
+            addButton.addEventListener('click', addRow);
+
+            // Load saved shortcuts and populate the table on page load
+            const loadedShortcuts = loadShortcuts();
+            loadedShortcuts.forEach(shortcut => addRow(shortcut.short, shortcut.replacement, shortcut.offset));
+        }
+    });
+
+})();
